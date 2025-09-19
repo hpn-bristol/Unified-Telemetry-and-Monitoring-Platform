@@ -1,0 +1,59 @@
+import influxdb_client
+from influxdb_client import InfluxDBClient, Point, WritePrecision
+from influxdb_client.client.write_api import SYNCHRONOUS
+from kafka import KafkaProducer
+import json
+import time
+
+# Connect to InfluxDB
+bucket = "demo"
+org = "University of Bristol"
+token = "Y0BrPbR8bwNocb6eDXfDgcBWJmisBS4MKFQ-q9fIByOCqndw8eZN9s_b966A6wyglawBOwItf9Z_RszXH9VqKQ=="
+url = "http://192.168.56.101:8086"
+
+client = influxdb_client.InfluxDBClient(
+    url=url,
+    token=token,
+    org=org
+)
+
+# Construct the query
+query = '''
+from(bucket: "demo")
+  |> range(start: -15s)
+  |> filter(fn: (r) => r._measurement == "voyager_BER")
+  |> filter(fn: (r) => r._field == "voyager1" or r._field == "voyager2" or r._field == "voyager3" or r._field == "voyager4" or r._field == "voyager5" or r._field == "voyager6" or r._field == "voyager7" or r._field == "voyager8")
+'''
+
+query_api = client.query_api()
+
+tables = query_api.query(query, org=org)
+
+data_list = []
+for table in tables:
+    for record in table.records:
+        data_list.append(record.values['_value'])  # Append directly to data_list
+
+
+
+def extract_data():
+    line_protocol = (
+        "voyager_BER,Location=voyager "
+        "voyager1={},voyager2={},voyager3={},voyager4={},voyager5={},voyager6={},voyager7={},voyager8={}"
+    ).format(data_list[0], data_list[1], data_list[2], data_list[3], data_list[4], data_list[5], data_list[6], data_list[7])
+
+    return line_protocol
+    
+    
+def main():
+    producer = KafkaProducer(bootstrap_servers=['192.168.56.102:9092'])
+
+    for _ in range(20000):
+        data = extract_data()
+        producer.send('voyager', bytes(f'{data}','UTF-8'))
+        print(f"voyager data is sent: {data}")
+        time.sleep(15)
+
+
+if __name__ == "__main__":
+    main()

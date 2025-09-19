@@ -1,0 +1,15 @@
+[[inputs.kafka_consumer]]
+  ## Kafka brokers.
+  brokers = ["192.168.56.102:9092"]
+
+  ## Topics to consume.
+  #topics = ["test"]
+  topics = ["voyager"]
+
+  data_format = "influx"
+
+[[outputs.influxdb_v2]]
+  urls = ["http://192.168.56.102:8086"]
+  token = "W0bBZ8_MFVRym9f8EGEvKAJQKgAf57jSlskOIJgX0p8PwbkRPeDOtrjwIeglUQONQbRv4Rw787WnUqLu0HHNZw=="
+  organization = "University of Bristol"
+  bucket = "demo"

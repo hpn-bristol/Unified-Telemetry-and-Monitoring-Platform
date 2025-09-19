@@ -1,0 +1,91 @@
+import json
+import ast
+import pandas as pd
+import requests
+import sys
+import csv
+import schedule
+import time
+
+from devicecontrol.voyager import Voyager
+from devicecontrol.polatis import oxc_api
+
+from kafka import KafkaProducer
+
+
+def run_voyager():
+    _headers = {
+        "Content-type": "application/json"
+        # "Accept": "application/json",
+        # 'Cache-Control': 'no-cache'
+    }
+    device_list = ("voyager1", "voyager2")
+    device_auth_dict = {
+        "voyager1": ("cumulus", "CumulusLinux!"),
+        "voyager2": ("cumulus", "CumulusLinux!"),
+    }
+    device_ip_dict = {"voyager1": "10.68.100.200", "voyager2": "10.68.100.201"}
+    device_type_dict = {"voyager1": "voyager", "voyager2": "voyager"}
+    device_url_dict = {
+        "voyager1": "https://10.68.100.200:8080/nclu/v1/rpc",
+        "voyager2": "https://10.68.100.201:8080/nclu/v1/rpc",
+    }
+
+
+
+    voyager1 = Voyager("voyager1", "10.68.100.200")
+    voyager2 = Voyager("voyager2", "10.68.100.201")
+
+            
+    data1 = voyager1.show_transponder()
+    data2 = voyager2.show_transponder()
+
+
+    v1 = data1[0]
+    v1_dict = json.loads(v1)
+    v2 = data2[0]
+    v2_dict = json.loads(v2)
+
+    a = [None]*8
+
+
+    a[0] = v1_dict['modules'][1]['network_interfaces'][0]['current_ber']
+    a[1] = v1_dict['modules'][1]['network_interfaces'][1]['current_ber']
+    a[2] = v1_dict['modules'][0]['network_interfaces'][0]['current_ber']
+    a[3] = v1_dict['modules'][0]['network_interfaces'][1]['current_ber']
+
+    a[4] = v2_dict['modules'][1]['network_interfaces'][0]['current_ber']
+    a[5] = v2_dict['modules'][1]['network_interfaces'][1]['current_ber']
+    a[6] = v2_dict['modules'][0]['network_interfaces'][0]['current_ber']
+    a[7] = v2_dict['modules'][0]['network_interfaces'][1]['current_ber']
+    
+    return a
+
+a = run_voyager()
+
+def extract_data():
+    line_protocol = (
+        "voyager_BER,Location=voyager "
+        "voyager1={},voyager2={},voyager3={},voyager4={},voyager5={},voyager6={},voyager7={},voyager8={}"
+    ).format(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7])
+
+    return line_protocol
+
+
+# if __name__ == '__main__':
+#     data = extract_data()
+#     print(data)
+    
+    
+def main():
+    producer = KafkaProducer(bootstrap_servers=['localhost:9092'])
+
+    for _ in range(20000):
+        data = extract_data()
+        producer.send('voyager', bytes(f'{data}','UTF-8'))
+        print(f"voyager data is sent: {data}")
+        time.sleep(15)
+
+
+if __name__ == "__main__":
+    main()
